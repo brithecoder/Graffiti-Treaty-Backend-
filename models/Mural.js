@@ -17,7 +17,7 @@ const MuralSchema = new mongoose.Schema({
   muralName: { type: String },
   settings: {
     partySize: { type: Number, min: 1, max: 30, default: 10 },
-    durationMinutes: { type: Number, min: 1, max: 60, default: 15 },
+    durationMinutes: { type: Number, min: 1, max: 3600, default: 60},
     sessionStatus: { 
       type: String, 
       enum: ['lobby', 'active', 'finished'], 

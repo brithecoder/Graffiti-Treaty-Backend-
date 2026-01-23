@@ -51,6 +51,13 @@ io.on('connection', (socket) => {
     updateRoomCount(io, wallCode);;
   });
 
+  // Server-side example
+socket.on("start_mission", ({ wallCode, durationMinutes }) => {
+  const finishAt = Date.now() + (durationMinutes * 60 * 1000);
+  io.to(wallCode).emit("mission_start_confirmed", { finishAt });
+});
+
+
   // Listen for drawing data and broadcast to everyone else in that room
   socket.on('send_stroke', (data) => {
     // data should contain { wallCode, strokeData, slotIndex }
