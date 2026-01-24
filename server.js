@@ -51,10 +51,18 @@ io.on('connection', (socket) => {
     updateRoomCount(io, wallCode);;
   });
 
-  // Server-side example
-socket.on("start_mission", ({ wallCode, durationMinutes }) => {
-  const finishAt = Date.now() + (durationMinutes * 60 * 1000);
-  io.to(wallCode).emit("mission_start_confirmed", { finishAt });
+ // Server-side updated for SECONDS
+socket.on("start_mission", ({ wallCode, durationSeconds }) => {
+  // durationSeconds is now e.g., 300 (for 5 mins)
+  const finishAt = Date.now() + (durationSeconds * 1000); 
+  
+  console.log(`🚀 Mission starting in room ${wallCode}. Ends at: ${new Date(finishAt).toLocaleTimeString()}`);
+
+  // Broadcast to EVERYONE in the room including the sender
+  io.to(wallCode).emit("mission_start_confirmed", { 
+    finishAt,
+    durationSeconds // Passing this back helps clients initialize their state
+  });
 });
 
 
@@ -81,12 +89,6 @@ socket.on("start_mission", ({ wallCode, durationMinutes }) => {
   socket.on('disconnect', () => {
     console.log('💨 User fully disconnected');
   });
-
-  socket.on('start_mural', (data) => {
-    // This sends 'mural_started' to everyone in the room EXCEPT the sender
-    socket.to(data.wallCode).emit('mural_started', data);
-  });
-
 
 
 });//end of socketConnection

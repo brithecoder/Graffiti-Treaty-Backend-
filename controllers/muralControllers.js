@@ -18,7 +18,7 @@ const createSession = async (req, res) => {
     settings: {
     muralName: muralName || "New Mission",
       partySize: partySize || 10,
-      durationMinutes: durationMinutes || 15,
+      durationSeconds: req.body.duration || 60,
       sessionStatus: 'lobby'
     },
     adminId: null, // Will be linked after User is created
