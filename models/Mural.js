@@ -1,14 +1,6 @@
 const mongoose = require('mongoose');
+const { StrokeSchema } = require('./Stroke');
 
-// Define the stroke structure once to reuse it
-const StrokeSchema = new mongoose.Schema({
-  points: [{ x: Number, y: Number }],
-  color: String,
-  size: Number,
-  cap: String,
-  isEraser: Boolean,
-  timestamp: { type: Date, default: Date.now }
-});
 
 const MuralSchema = new mongoose.Schema({
   wallCode: { type: String, required: true, unique: true },
@@ -30,7 +22,6 @@ const MuralSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     artistName: String,
     slotIndex: { type: Number, min: 0, max: 29 },
-    strokes: [StrokeSchema], // Individual paint data per user
     lastActive: { type: Date, default: Date.now }
   }],
 

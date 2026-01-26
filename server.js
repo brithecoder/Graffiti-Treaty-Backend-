@@ -6,7 +6,7 @@ require('dotenv').config();
 const path = require('path');
 const db = require('./config/connections');
 const routes = require('./routes/apiRoutes');
-const { updateRoomCount } = require('./utils/helpers');
+const socketHandler = require("./socketHandler");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -35,64 +35,31 @@ app.use(express.json());
  
 // if we're in production, serve client/build as static assets
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/build')));
+  app.use(express.static(path.join(__dirname,'./client/dist')));
 }
  
 app.use('/api', routes);
 
-// 3. Socket.io Logic
-io.on('connection', (socket) => {
-  console.log('⚡ A user connected:', socket.id);
 
-  // Join a specific wall room based on wallCode
-  socket.on('join_wall', (wallCode) => {
-    socket.join(wallCode);
-    console.log(`👤 User ${socket.id} joined room: ${wallCode}`)
-    updateRoomCount(io, wallCode);;
-  });
 
- // Server-side updated for SECONDS
-socket.on("start_mission", ({ wallCode, durationSeconds }) => {
-  // durationSeconds is now e.g., 300 (for 5 mins)
-  const finishAt = Date.now() + (durationSeconds * 1000); 
-  
-  console.log(`🚀 Mission starting in room ${wallCode}. Ends at: ${new Date(finishAt).toLocaleTimeString()}`);
-
-  // Broadcast to EVERYONE in the room including the sender
-  io.to(wallCode).emit("mission_start_confirmed", { 
-    finishAt,
-    durationSeconds // Passing this back helps clients initialize their state
-  });
+app.get('/api/mural/strokes/:wallCode', async (req, res) => {
+  try {
+    const { wallCode } = req.params;
+    
+    // Find all strokes, sorted by timestamp (oldest first)
+    const strokes = await Stroke.find({ wallCode })
+      .sort({ timestamp: 1 }) // This ensures the timelapse plays in order
+      .lean(); // Faster performance
+      
+    res.json(strokes);
+  } catch (err) {
+    console.error("❌ Failed to fetch strokes:", err);
+    res.status(500).json({ error: "Could not fetch mural data" });
+  }
 });
 
-
-  // Listen for drawing data and broadcast to everyone else in that room
-  socket.on('send_stroke', (data) => {
-    // data should contain { wallCode, strokeData, slotIndex }
-    socket.to(data.wallCode).emit('receive_stroke', data);
-  });
-
- // Change 'disconnect' to 'disconnecting'
-  socket.on('disconnecting', () => {
-    console.log('🔥 User disconnecting:', socket.id);
-    
-    // socket.rooms contains the rooms the user is currently in
-    socket.rooms.forEach((room) => {
-      // Ignore the socket's private room (which is just its own ID)
-      if (room !== socket.id) {
-        // We wait 100ms so the count is calculated AFTER they are gone
-        setTimeout(() => updateRoomCount(io, room), 100);
-      }
-    });
-  });
-
-  socket.on('disconnect', () => {
-    console.log('💨 User fully disconnected');
-  });
-
-
-});//end of socketConnection
-
+// Initialize the Socket Logic
+socketHandler(io);
 
  db.once('open', () => {
   console.log('✅ Connected to MongoDB');
