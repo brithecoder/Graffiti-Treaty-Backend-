@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const { StrokeSchema } = require('./Stroke');
 
 
 const MuralSchema = new mongoose.Schema({
