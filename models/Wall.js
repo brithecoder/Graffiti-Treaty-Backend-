@@ -21,7 +21,8 @@ wallCode: { type: String, unique: true, required: true },
   
   // TIMESTAMPS
   createdAt: { type: Date, default: Date.now },
-  startedAt: { type: Date }, // Set when the creator clicks "Start"
+  startedAt: { type: Date },// Set when the creator clicks "Start
+  finishAt: { type: Number }, 
   endedAt: { type: Date },   // Set when the timer hits zero
   
   // METADATA

@@ -1,112 +1,144 @@
-
-const { updateRoomCount } = require('./utils/helpers');
-const Stroke = require('./models/Stroke');
+const { updateRoomCount } = require("./utils/helpers");
+const Stroke = require("./models/Stroke");
 const Wall = require("./models/Wall");
 const wallSlots = {};
 
-//  Socket.io Logic
-
 module.exports = (io) => {
-io.on('connection', (socket) => {
-  console.log('⚡ A user connected:', socket.id);
+  io.on("connection", (socket) => {
+    console.log("⚡ A user connected:", socket.id);
 
- 
-    socket.on('join_wall', async (data) => {
-      // Handle both formats just in case
-      const wallCode = typeof data === 'string' ? data : data.wallCode;
+    // --- JOIN WALL ---
+    socket.on("join_wall", async (data) => {
+      const rawCode = typeof data === "string" ? data : data.wallCode;
+      const wallCode = rawCode?.trim().toUpperCase();
       const artistName = data.artistName || "Mystery Tagger";
+      const muralName = data.muralName || "Untitled Mural";
 
       if (!wallCode) return;
 
       socket.join(wallCode);
       console.log(`👤 User ${artistName} joined room: ${wallCode}`);
-
-      // 1. SLOT ASSIGNMENT
-      if (!wallSlots[wallCode]) {
-        wallSlots[wallCode] = new Array(30).fill(null);
-      }
-       let slotIndex = wallSlots[wallCode].indexOf(artistName);
-
-      // FIX 2: Call this AFTER joining
-       updateRoomCount(io, wallCode)
+      // If the wall doesn't exist yet, CREATE it!
 
       try {
+        const wall = await Wall.findOne({ wallCode });
+        if (!wall) {
+          console.log(`✨ Wall record missing for ${wallCode}. Creating...`);
+          wall = await Wall.create({
+            wallCode: wallCode,
+            status: "waiting", // Start in waiting mode
+            muralName: muralName || "Untitled Mural",
+          });
+        }
+        console.log(`WALL SEARCHED: ${wallCode} | STATUS: ${wall.status}`);
+        // Late Joiner Sync
+        if (wall && wall.status === "active") {
+          console.log(">>> EMITTING already_started to:", socket.id);
+          console.log(`Sending already_started to late joiner: ${artistName}`);
+          socket.emit("already_started", {
+            finishAt: wall.finishAt,
+            durationSeconds: wall.timerDuration,
+            muralName: wall.muralName,
+          });
+        } else {
+          console.log(
+            "Wall not active. Status is:",
+            wall ? wall.status : "NULL",
+          );
+        }
+
+        // 1. SLOT ASSIGNMENT
+        if (!wallSlots[wallCode]) {
+          wallSlots[wallCode] = new Array(30).fill(null);
+        }
+        let slotIndex = wallSlots[wallCode].indexOf(artistName);
+        if (slotIndex === -1) {
+          slotIndex = wallSlots[wallCode].indexOf(null);
+          if (slotIndex !== -1) wallSlots[wallCode][slotIndex] = artistName;
+        }
+
+        // 2. Initial Data Load
         const existingStrokes = await Stroke.find({ wallCode });
-        socket.emit("initial_canvas_load", { 
-          strokes: existingStrokes, 
-          slotIndex 
+        socket.emit("initial_canvas_load", {
+          strokes: existingStrokes,
+          slotIndex,
         });
+
+        // 3. Update Everyone's Count
+        setTimeout(() => updateRoomCount(io, wallCode), 100);
       } catch (err) {
-        console.error("Failed to load initial strokes:", err);
-      } 
+        console.error("Join Wall Error:", err);
+      }
     });
 
-socket.on("start_mission", async (data) => {
+    // --- START MISSION ---
+    socket.on("start_mission", async (data) => {
       const { wallCode, durationSeconds } = data;
-      const finishAt = Date.now() + (durationSeconds * 1000); 
-      
+      const finishAt = Date.now() + durationSeconds * 1000;
+
       try {
-        await Wall.findOneAndUpdate({ wallCode }, { status: 'active', isStarted: true });
-        
-        // Use io.to(wallCode) so EVERYONE gets the start signal
-        io.to(wallCode).emit("mission_start_confirmed", { finishAt, durationSeconds });
+        await Wall.findOneAndUpdate(
+          { wallCode },
+          {
+            status: "active",
+            isStarted: true,
+            finishAt: finishAt,
+          },
+        );
+        console.log(`✅ DATABASE UPDATED: Wall ${wallCode} is now active.`);
+        io.to(wallCode).emit("mission_start_confirmed", {
+          finishAt,
+          durationSeconds,
+        });
 
         setTimeout(async () => {
-          io.to(wallCode).emit('mission_ended');
-          await Wall.findOneAndUpdate({ wallCode }, { status: 'finished', isStarted: false, endedAt: Date.now() });
+          io.to(wallCode).emit("mission_ended");
+          await Wall.findOneAndUpdate(
+            { wallCode },
+            { status: "finished", isStarted: false, endedAt: Date.now() },
+          );
         }, durationSeconds * 1000);
       } catch (err) {
         console.error("Mission Start Error:", err);
       }
     });
 
-    // ... rest of your stroke/clear listeners
- 
-socket.on('send_stroke', async (data) => {
-  // 1. Keep the real-time sync (what you already have)
-  socket.to(data.wallCode).emit('receive_stroke', data);
-
-  // 2. Save to Database for the timelapse
-  try {
-    await Stroke.create({
-      ...data,
-      timestamp: Date.now() 
-    });
-    console.log(`Saved stroke for ${data.wallCode}`);
-  } catch (err) {
-    console.error("Failed to record stroke:", err);
-  }
-});
-
-
-  socket.on("clear_quadrant", async ({ wallCode, artistName }) => {
-  try {
-    // 1. Delete only the strokes belonging to THIS artist on THIS wall
-    await Stroke.deleteMany({ wallCode: wallCode, artistName: artistName });
-    
-    // 2. Tell the user's client it's done so they can wipe their local p5 screen
-    socket.emit("quadrant_cleared_confirm");
-    
-    console.log(`Cleared strokes for artist: ${artistName} on wall: ${wallCode}`);
-  } catch (err) {
-    console.error("Clear failed:", err);
-  }
-});
-
-
- // Change 'disconnect' to 'disconnecting'
-  socket.on('disconnecting', () => {
-    console.log('🔥 User disconnecting:', socket.id);
-    
-    // socket.rooms contains the rooms the user is currently in
-    socket.rooms.forEach((room) => {
-      // Ignore the socket's private room (which is just its own ID)
-      if (room !== socket.id) {
-        // We wait 100ms so the count is calculated AFTER they are gone
-        setTimeout(() => updateRoomCount(io, room), 100);
+    // --- STROKE LOGIC ---
+    socket.on("send_stroke", async (data) => {
+      socket.to(data.wallCode).emit("receive_stroke", data);
+      try {
+        await Stroke.create({
+          ...data,
+          timestamp: Date.now(),
+        });
+      } catch (err) {
+        console.error("Failed to record stroke:", err);
       }
     });
-  });
 
-});//end of socketConnection
-}
+    // --- ROOM UPDATES ---
+    socket.on("request_room_update", ({ wallCode }) => {
+      updateRoomCount(io, wallCode);
+    });
+
+    // --- CLEAR QUADRANT ---
+    socket.on("clear_quadrant", async ({ wallCode, artistName }) => {
+      try {
+        await Stroke.deleteMany({ wallCode: wallCode, artistName: artistName });
+        socket.emit("quadrant_cleared_confirm");
+      } catch (err) {
+        console.error("Clear failed:", err);
+      }
+    });
+
+    // --- DISCONNECT ---
+    socket.on("disconnecting", () => {
+      console.log("🔥 User disconnecting:", socket.id);
+      socket.rooms.forEach((room) => {
+        if (room !== socket.id) {
+          setTimeout(() => updateRoomCount(io, room), 100);
+        }
+      });
+    });
+  }); // End of io.on('connection')
+}; // End of module.exports
