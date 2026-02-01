@@ -10,40 +10,11 @@ module.exports = (io) => {
 io.on('connection', (socket) => {
   console.log('⚡ A user connected:', socket.id);
 
-  // Join a specific wall room based on wallCode
-//   socket.on('join_wall', async (wallCode) => {
-//     if (!wallCode) return;
-//     socket.join(wallCode);
-//   console.log(`👤 User ${artistName} joined room: ${wallCode}`);
-//     // 1. SLOT ASSIGNMENT (Quadrant Logic)
-//       if (!wallSlots[wallCode]) {
-//         wallSlots[wallCode] = new Array(30).fill(null);
-//       }
-
-//       // If user is already in a slot (refresh), find it. Otherwise, find first empty.
-//       let slotIndex = wallSlots[wallCode].indexOf(artistName);
-//       if (slotIndex === -1) {
-//         slotIndex = wallSlots[wallCode].indexOf(null);
-//         if (slotIndex !== -1) {
-//           wallSlots[wallCode][slotIndex] = artistName;
-//         }
-//       }
-//       updateRoomCount(io, wallCode);  
-//     try {
-//         const existingStrokes = await Stroke.find({ wallCode }); // Corrected 'StrokeModel' to 'Stroke'
-//         socket.emit("initial_canvas_load", { 
-//           strokes: existingStrokes, 
-//           slotIndex 
-//         });
-//       } catch (err) {
-//         console.error("Failed to load initial strokes:", err);
-//       } 
-//   });
-// FIX 1: Destructure the object here!
+ 
     socket.on('join_wall', async (data) => {
       // Handle both formats just in case
       const wallCode = typeof data === 'string' ? data : data.wallCode;
-      const artistName = data.artistName || "Mysterious Tagger";
+      const artistName = data.artistName || "Mystery Tagger";
 
       if (!wallCode) return;
 
@@ -54,17 +25,10 @@ io.on('connection', (socket) => {
       if (!wallSlots[wallCode]) {
         wallSlots[wallCode] = new Array(30).fill(null);
       }
-
-      let slotIndex = wallSlots[wallCode].indexOf(artistName);
-      if (slotIndex === -1) {
-        slotIndex = wallSlots[wallCode].indexOf(null);
-        if (slotIndex !== -1) {
-          wallSlots[wallCode][slotIndex] = artistName;
-        }
-      }
+       let slotIndex = wallSlots[wallCode].indexOf(artistName);
 
       // FIX 2: Call this AFTER joining
-      updateRoomCount(io, wallCode);  
+       updateRoomCount(io, wallCode)
 
       try {
         const existingStrokes = await Stroke.find({ wallCode });
@@ -76,44 +40,6 @@ io.on('connection', (socket) => {
         console.error("Failed to load initial strokes:", err);
       } 
     });
-
- // Server-side updated for SECONDS
-// 1. Added 'async' here so 'await' works
-// socket.on("start_mission", async ({ wallCode, durationSeconds }) => {
-//   const finishAt = Date.now() + (durationSeconds * 1000); 
-  
-//   // 2. Update DB to 'active' immediately when mission starts
-//   try {
-//     await Wall.findOneAndUpdate({ wallCode }, { status: 'active', isStarted: true });
-//   } catch (err) {
-//     console.error("DB Error on start:", err);
-//   }
-
-//   // 3. Confirm to clients
-//   io.to(wallCode).emit("mission_start_confirmed", { finishAt, durationSeconds });
-
-//   // 4. THE TIMER: Wait for the duration, then execute the finish logic
-//   setTimeout(async () => {
-//     console.log(`🏁 Time is up for room ${wallCode}!`);
-    
-//     // Tell clients to stop drawing and start reveal
-//     io.to(wallCode).emit('mission_ended');
-
-//     try {
-//       await Wall.findOneAndUpdate(
-//         { wallCode: wallCode }, 
-//         { 
-//           status: 'finished',
-//           isStarted: false, 
-//           endedAt: Date.now() 
-//         }
-//       );
-//       console.log(`✅ Wall ${wallCode} marked as FINISHED.`);
-//     } catch (err) {
-//       console.error("❌ Failed to update wall status:", err.message);
-//     }
-//   }, durationSeconds * 1000); // This tells the server to wait exactly X seconds
-// });
 
 socket.on("start_mission", async (data) => {
       const { wallCode, durationSeconds } = data;
