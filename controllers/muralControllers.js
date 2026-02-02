@@ -6,7 +6,7 @@ const { generateShortCode } = require('../utils/helpers');
 
 
 const createSession = async (req, res) => {
-  const { nickname, muralName, partySize, durationMinutes } = req.body;
+  const { nickname, muralName, partySize, durationSeconds } = req.body;
 
   const wallCode = generateShortCode(4); // e.g., "ABCD"
   const adminCode = Math.floor(1000 + Math.random() * 9000).toString(); // e.g., "1234"
