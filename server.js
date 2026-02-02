@@ -11,9 +11,20 @@ const socketHandler = require("./socketHandler");
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// 2. ENABLE CORS for Express routes
+
+const allowedOrigins = [
+  "http://localhost:5173", 
+  "https://your-mural-frontend.onrender.com" // Replace with your frontend URL later
+];
+
 app.use(cors({
-  origin: "http://localhost:5173", // Trust your Vite app
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ["GET", "POST", "DELETE", "PUT"],
   credentials: true
 }));
@@ -25,7 +36,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Update this to match your Vite port!
+    origin: allowedOrigins, // Update this to match your Vite port!
     methods: ["GET", "POST", "DELETE", "PUT"],
   }
 });
@@ -49,7 +60,8 @@ socketHandler(io);
 
  db.once('open', () => {
   console.log('✅ Connected to MongoDB');
-  server.listen(PORT, () => {
+  // FIX: Added "0.0.0.0" to ensure Render can route traffic to the container
+  server.listen(PORT, "0.0.0.0", () => {
     console.log(`🌍 Mural Server & Socket.io running on port ${PORT}!`);
   });
 });
