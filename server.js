@@ -14,20 +14,17 @@ const PORT = process.env.PORT || 3001;
 
 const allowedOrigins = [
   "http://localhost:5173", 
-  "https://your-mural-frontend.onrender.com" // Replace with your frontend URL later
+  "https://graffiti-treaty.netlify.app" 
 ];
 
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ["GET", "POST", "DELETE", "PUT"],
-  credentials: true
+  // Pass the array directly instead of using a function
+  origin: allowedOrigins, 
+  methods: ["GET", "POST", "DELETE", "PUT", "OPTIONS"],
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
 
  
 // 1. Wrap Express in an HTTP Server
@@ -38,6 +35,7 @@ const io = new Server(server, {
   cors: {
     origin: allowedOrigins, // Update this to match your Vite port!
     methods: ["GET", "POST", "DELETE", "PUT"],
+     credentials: true,
   }
 });
 
