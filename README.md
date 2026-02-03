@@ -2,6 +2,11 @@
 
 The backbone of a real-time, collaborative graffiti experience. This server manages high-frequency stroke data, synchronized session timers, and multi-user room states using Node.js, Socket.io, and MongoDB.
 
+## 🚀 Live Deployments
+- **Frontend (Client):** [https://graffiti-treaty.netlify.app/](https://graffiti-treaty.netlify.app/)
+- **Backend (API):** [https://graffiti-treaty-backend.onrender.com](https://graffiti-treaty-backend.onrender.com)
+
+
 ## 🚀 Core Features
 **Real-time Synchronization:** Sub-100ms latency for stroke distribution across all artists in a room.
 
